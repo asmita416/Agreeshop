@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h3>Add New Product</h3>
+
+<form method="POST" style="max-width: 600px; margin: auto;">
+    <div class="mb-3">
+        <label class="form-label">Product Name</label>
+        <input class="form-control" name="name" placeholder="Product Name" required>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Category</label>
+        <select class="form-control" name="category_id" required>
+            <option value="">Select Category</option>
+            {% for category in categories %}
+            <option value="{{ category[0] }}">{{ category[1] }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Price (₹)</label>
+        <input class="form-control" name="price" placeholder="Price" type="number" required>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Image URL</label>
+        <input class="form-control" name="image" placeholder="Image URL" required>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Description</label>
+        <textarea class="form-control" name="description" placeholder="Product description" rows="3"></textarea>
+    </div>
+
+    <button class="btn btn-success">Add Product</button>
+</form>
+
+<hr>
+<h4 class="mt-4">Product Management</h4>
+<p class="text-muted">Admin panel - manage your agricultural products</p>
+
+{% endblock %}
