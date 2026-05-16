@@ -3,26 +3,152 @@
 <head>
     <title>AgriShop</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .navbar {
+            background-color: #28a745 !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .navbar-brand {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+        .nav-link {
+            color: white !important;
+            margin: 0 10px;
+            transition: opacity 0.3s;
+        }
+        .nav-link:hover {
+            opacity: 0.8;
+        }
+        .badge {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background-color: #dc3545;
+            color: white;
+            border-radius: 50%;
+            padding: 2px 6px;
+            font-size: 12px;
+        }
+        .dropdown-menu {
+            min-width: 200px;
+        }
+        .dropdown-item:hover {
+            background-color: #28a745;
+            color: white;
+        }
+        footer {
+            background-color: #343a40;
+            color: white;
+            padding: 20px 0;
+            margin-top: 50px;
+        }
+    </style>
 </head>
 <body>
 
-<nav class="navbar navbar-dark bg-success p-3">
-    <a class="navbar-brand text-white" href="/">🌾 AgriShop</a>
-    <div class="ms-auto">
-        <a href="/cart" class="text-white me-3">Cart</a>
-        {% if session.get('user') %}
-            <a href="/admin" class="text-white me-3">Admin</a>
-            <a href="/logout" class="text-white">Logout ({{ session.get('user') }})</a>
-        {% else %}
-            <a href="/login" class="text-white me-3">Login</a>
-            <a href="/register" class="text-white">Register</a>
-        {% endif %}
+<!-- NAVBAR -->
+<nav class="navbar navbar-expand-lg navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="/">🌾 AgriShop</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav ms-auto">
+                <!-- HOME -->
+                <li class="nav-item">
+                    <a class="nav-link" href="/">
+                        <i class="bi bi-house"></i> Home
+                    </a>
+                </li>
+
+                <!-- CATEGORIES DROPDOWN -->
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" id="categoriesDropdown" role="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-list"></i> Categories
+                    </a>
+                    <ul class="dropdown-menu" aria-labelledby="categoriesDropdown">
+                        <li><a class="dropdown-item" href="/category/1">🌱 Seeds</a></li>
+                        <li><a class="dropdown-item" href="/category/2">🌿 Fertilizers</a></li>
+                        <li><a class="dropdown-item" href="/category/3">🐛 Pesticides</a></li>
+                        <li><a class="dropdown-item" href="/category/4">🔨 Tools</a></li>
+                        <li><a class="dropdown-item" href="/category/5">🚜 Machinery</a></li>
+                    </ul>
+                </li>
+
+                <!-- CART -->
+                <li class="nav-item">
+                    <a class="nav-link position-relative" href="/cart">
+                        <i class="bi bi-cart"></i> Cart
+                        {% set cart_count = session.get('cart', {})|length %}
+                        {% if cart_count > 0 %}
+                            <span class="badge">{{ cart_count }}</span>
+                        {% endif %}
+                    </a>
+                </li>
+
+                <!-- USER MENU -->
+                {% if session.get('user') %}
+                    <!-- WISHLIST -->
+                    <li class="nav-item">
+                        <a class="nav-link" href="/wishlist">
+                            <i class="bi bi-heart"></i> Wishlist
+                        </a>
+                    </li>
+
+                    <!-- USER DROPDOWN -->
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-person-circle"></i> {{ session.get('user') }}
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="userDropdown">
+                            <li><a class="dropdown-item" href="/profile"><i class="bi bi-person"></i> Profile</a></li>
+                            <li><a class="dropdown-item" href="/my-orders"><i class="bi bi-bag"></i> My Orders</a></li>
+                            <li><a class="dropdown-item" href="/wishlist"><i class="bi bi-heart"></i> Wishlist</a></li>
+                            {% if session.get('user') == 'admin' %}
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="/admin"><i class="bi bi-gear"></i> Admin Panel</a></li>
+                            {% endif %}
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="/logout"><i class="bi bi-box-arrow-right"></i> Logout</a></li>
+                        </ul>
+                    </li>
+                {% else %}
+                    <!-- LOGIN & REGISTER -->
+                    <li class="nav-item">
+                        <a class="nav-link" href="/login">
+                            <i class="bi bi-box-arrow-in-right"></i> Login
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/register">
+                            <i class="bi bi-person-plus"></i> Register
+                        </a>
+                    </li>
+                {% endif %}
+            </ul>
+        </div>
     </div>
 </nav>
 
-<div class="container mt-4">
+<!-- MAIN CONTENT -->
+<div class="container mt-4 mb-5">
     {% block content %}{% endblock %}
 </div>
 
+<!-- FOOTER -->
+<footer class="text-center">
+    <div class="container">
+        <p>&copy; 2024 AgriShop. All rights reserved.</p>
+        <p>Quality Agricultural Products | Fast Delivery | Best Prices</p>
+    </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+{% block content %}
+
+<!-- BREADCRUMB -->
+<nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/my-orders">My Orders</a></li>
+        <li class="breadcrumb-item active">#ORD-{{ order[0] }}</li>
+    </ol>
+</nav>
+
+<h3 class="mb-4"><i class="bi bi-bag"></i> Order #ORD-{{ order[0] }}</h3>
+
+<div class="row">
+    <!-- ORDER STATUS -->
+    <div class="col-md-8 mb-4">
+        <!-- STATUS TIMELINE -->
+        <div class="card mb-4">
+            <div class="card-header bg-success text-white">
+                <h6 class="mb-0"><i class="bi bi-check2-circle"></i> Order Status Timeline</h6>
+            </div>
+            <div class="card-body p-4">
+                <div class="timeline">
+                    <!-- PENDING TO CONFIRMED -->
+                    <div class="timeline-item mb-4">
+                        <div class="timeline-marker {% if order[4] in ['Confirmed', 'Shipped', 'Delivered'] %}bg-success{% else %}bg-secondary{% endif %}" style="width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; margin-bottom: 10px;">
+                            <i class="bi bi-check"></i>
+                        </div>
+                        <h6>Order Confirmed</h6>
+                        <p class="text-muted small mb-0">{{ order[3] }}</p>
+                    </div>
+
+                    <!-- CONFIRMED TO SHIPPED -->
+                    <div class="timeline-item mb-4">
+                        <div class="timeline-marker {% if order[4] in ['Shipped', 'Delivered'] %}bg-success{% else %}bg-secondary{% endif %}" style="width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; margin-bottom: 10px;">
+                            <i class="bi bi-truck"></i>
+                        </div>
+                        <h6>Shipped</h6>
+                        <p class="text-muted small mb-0">
+                            {% if order[4] in ['Shipped', 'Delivered'] %}
+                                In transit to your location
+                            {% else %}
+                                Waiting to be shipped
+                            {% endif %}
+                        </p>
+                    </div>
+
+                    <!-- SHIPPED TO DELIVERED -->
+                    <div class="timeline-item">
+                        <div class="timeline-marker {% if order[4] == 'Delivered' %}bg-success{% else %}bg-secondary{% endif %}" style="width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; margin-bottom: 10px;">
+                            <i class="bi bi-house-check"></i>
+                        </div>
+                        <h6>Delivered</h6>
+                        <p class="text-muted small mb-0">
+                            {% if order[4] == 'Delivered' %}
+                                Delivered on {{ delivery[4] }}
+                            {% else %}
+                                Estimated: {{ delivery[3] }}
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ORDER ITEMS -->
+        <div class="card mb-4">
+            <div class="card-header bg-success text-white">
+                <h6 class="mb-0"><i class="bi bi-box-seam"></i> Order Items</h6>
+            </div>
+            <div class="card-body">
+                <table class="table table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Product</th>
+                            <th>Quantity</th>
+                            <th>Price</th>
+                            <th>Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in order_items %}
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        {% if item[8] %}
+                                            <img src="{{ item[8] }}" alt="{{ item[7] }}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 5px; margin-right: 10px;">
+                                        {% endif %}
+                                        <strong>{{ item[7] }}</strong>
+                                    </div>
+                                </td>
+                                <td>{{ item[3] }}</td>
+                                <td>₹{{ item[4] }}</td>
+                                <td class="fw-bold text-success">₹{{ item[3] * item[4] }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ORDER SUMMARY SIDEBAR -->
+    <div class="col-md-4">
+        <!-- ORDER SUMMARY -->
+        <div class="card mb-4">
+            <div class="card-header bg-success text-white">
+                <h6 class="mb-0"><i class="bi bi-receipt"></i> Order Summary</h6>
+            </div>
+            <div class="card-body">
+                <dl class="row">
+                    <dt class="col-sm-6">Order Date:</dt>
+                    <dd class="col-sm-6">{{ order[3] }}</dd>
+
+                    <dt class="col-sm-6">Order Status:</dt>
+                    <dd class="col-sm-6">
+                        <span class="badge {% if order[4] == 'Delivered' %}bg-success{% elif order[4] == 'Shipped' %}bg-info{% else %}bg-warning{% endif %}">
+                            {{ order[4] }}
+                        </span>
+                    </dd>
+
+                    <dt class="col-sm-6">Payment Status:</dt>
+                    <dd class="col-sm-6">
+                        <span class="badge bg-success">{{ order[5] }}</span>
+                    </dd>
+
+                    <dt class="col-sm-6">Total Amount:</dt>
+                    <dd class="col-sm-6 text-success fw-bold fs-5">₹{{ order[2] }}</dd>
+                </dl>
+            </div>
+        </div>
+
+        <!-- DELIVERY DETAILS -->
+        <div class="card mb-4">
+            <div class="card-header bg-info text-white">
+                <h6 class="mb-0"><i class="bi bi-geo-alt"></i> Delivery Details</h6>
+            </div>
+            <div class="card-body">
+                <p class="mb-2">
+                    <strong>Status:</strong><br>
+                    <span class="badge bg-warning">{{ delivery[2] }}</span>
+                </p>
+                <p class="mb-2">
+                    <strong>Estimated Delivery:</strong><br>
+                    <span>{{ delivery[3] }}</span>
+                </p>
+                {% if delivery[4] %}
+                    <p class="mb-2">
+                        <strong>Delivery Date:</strong><br>
+                        <span>{{ delivery[4] }}</span>
+                    </p>
+                {% endif %}
+                {% if delivery[5] %}
+                    <p class="mb-0">
+                        <strong>Notes:</strong><br>
+                        <span class="text-muted">{{ delivery[5] }}</span>
+                    </p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- PAYMENT DETAILS -->
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h6 class="mb-0"><i class="bi bi-credit-card"></i> Payment Details</h6>
+            </div>
+            <div class="card-body">
+                <p class="mb-2">
+                    <strong>Amount Paid:</strong><br>
+                    <span class="text-success fw-bold fs-5">₹{{ order[2] }}</span>
+                </p>
+                <p class="mb-2">
+                    <strong>Payment Status:</strong><br>
+                    <span class="badge bg-success">{{ order[5] }}</span>
+                </p>
+                {% if order[6] %}
+                    <p class="mb-0">
+                        <strong>Transaction ID:</strong><br>
+                        <span class="text-muted small">{{ order[6] }}</span>
+                    </p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- ACTION BUTTONS -->
+        <div class="mt-4 d-flex gap-2">
+            <a href="/my-orders" class="btn btn-outline-success flex-grow-1">
+                <i class="bi bi-arrow-left"></i> Back to Orders
+            </a>
+            <a href="/" class="btn btn-success flex-grow-1">
+                <i class="bi bi-shop"></i> Shop More
+            </a>
+        </div>
+    </div>
+</div>
+
+<style>
+.timeline-item {
+    display: flex;
+    align-items: flex-start;
+    position: relative;
+}
+</style>
+
+{% endblock %}

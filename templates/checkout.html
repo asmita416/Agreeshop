@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h3 class="mb-4"><i class="bi bi-bag-check"></i> Checkout</h3>
+
+<div class="row">
+    <!-- DELIVERY ADDRESS -->
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="bi bi-geo-alt"></i> Delivery Address</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">Full Name</label>
+                        <input type="text" class="form-control" value="{{ user[1] }}" disabled>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-control" value="{{ user[3] or 'Not provided' }}" disabled>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Phone Number</label>
+                        <input type="tel" class="form-control" value="{{ user[4] or 'Not provided' }}" disabled>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Address</label>
+                        <textarea class="form-control" rows="3" disabled>{{ user[5] or 'Please update your profile with delivery address' }}</textarea>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">City</label>
+                            <input type="text" class="form-control" value="{{ user[7] or 'Not provided' }}" disabled>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Pincode</label>
+                            <input type="text" class="form-control" value="{{ user[8] or 'Not provided' }}" disabled>
+                        </div>
+                    </div>
+
+                    <a href="/profile" class="btn btn-outline-success w-100">
+                        <i class="bi bi-pencil"></i> Update Address
+                    </a>
+
+                    <!-- ORDER SUMMARY SIDEBAR FOR MOBILE -->
+                    <div class="card mt-4 d-md-none">
+                        <div class="card-body">
+                            <h6 class="card-title">Order Summary</h6>
+                            <table class="table table-sm">
+                                <tr>
+                                    <td>Subtotal:</td>
+                                    <td class="text-end">₹{{ total }}</td>
+                                </tr>
+                                <tr>
+                                    <td>Delivery:</td>
+                                    <td class="text-end">₹{{ shipping }}</td>
+                                </tr>
+                                <tr class="fw-bold">
+                                    <td>Total:</td>
+                                    <td class="text-end text-success">₹{{ final_total }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+
+                    <input type="hidden" name="total_amount" value="{{ final_total }}">
+                    <button type="submit" class="btn btn-success w-100 btn-lg mt-4">
+                        <i class="bi bi-arrow-right"></i> Proceed to Payment
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ORDER DETAILS -->
+    <div class="col-md-6">
+        <!-- ORDER ITEMS -->
+        <div class="card mb-4">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="bi bi-bag"></i> Order Items</h5>
+            </div>
+            <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+                {% for item in cart_items %}
+                    <div class="d-flex justify-content-between align-items-center mb-3 pb-3 border-bottom">
+                        <div>
+                            <img src="{{ item.product[3] }}" alt="{{ item.product[1] }}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 5px; margin-right: 10px;" class="float-start">
+                            <div>
+                                <strong>{{ item.product[1] }}</strong>
+                                <p class="text-muted small mb-0">Qty: {{ item.quantity }}</p>
+                            </div>
+                        </div>
+                        <div class="text-end">
+                            <strong class="text-success">₹{{ item.subtotal }}</strong>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- ORDER SUMMARY -->
+        <div class="card border-success">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="bi bi-receipt"></i> Order Summary</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Subtotal:</span>
+                    <span class="fw-bold">₹{{ total }}</span>
+                </div>
+                <div class="d-flex justify-content-between mb-3">
+                    <span>Delivery Charges:</span>
+                    <span class="fw-bold text-success">₹{{ shipping }}</span>
+                </div>
+                <hr>
+                <div class="d-flex justify-content-between fw-bold fs-5 text-success">
+                    <span>Total Amount:</span>
+                    <span>₹{{ final_total }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- DELIVERY INFO -->
+        <div class="alert alert-info mt-4">
+            <h6 class="alert-heading"><i class="bi bi-truck"></i> Delivery Information</h6>
+            <p class="small mb-1">✓ Estimated delivery: 3-5 business days</p>
+            <p class="small mb-1">✓ Free delivery on orders above ₹500</p>
+            <p class="small">✓ Cash on Delivery & Online Payment available</p>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
