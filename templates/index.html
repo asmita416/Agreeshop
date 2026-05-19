@@ -3,9 +3,9 @@
 
 <!-- HERO SECTION -->
 <div class="alert alert-success text-center mb-5" style="background: linear-gradient(135deg, #28a745, #20c997); border: none;">
-    <h1 class="text-white" style="font-size: 3rem; font-weight: bold;">🌾 Welcome to AgriShop</h1>
-    <p class="text-white lead">Your one-stop shop for agricultural products</p>
-    <p class="text-white">Quality Seeds • Fertilizers • Pesticides • Tools • Machinery</p>
+    <h1 class="text-white" style="font-size: 3rem; font-weight: bold;">🌾 {{ request.get_translation('welcome_to_agrishop') }}</h1>
+    <p class="text-white lead">{{ request.get_translation('one_stop_shop') }}</p>
+    <p class="text-white">{{ request.get_translation('quality_products') }}</p>
 </div>
 
 <!-- CATEGORIES DISPLAY -->
@@ -14,20 +14,20 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2 class="text-success border-bottom pb-2" style="flex-grow: 1;">
             {% if category[1] == "Seeds" %}
-                🌱 {{ category[1] }}
+                🌱 {{ request.get_translation('seeds') }}
             {% elif category[1] == "Fertilizers" %}
-                🌿 {{ category[1] }}
+                🌿 {{ request.get_translation('fertilizers') }}
             {% elif category[1] == "Pesticides" %}
-                🐛 {{ category[1] }}
+                🐛 {{ request.get_translation('pesticides') }}
             {% elif category[1] == "Tools" %}
-                🔨 {{ category[1] }}
+                🔨 {{ request.get_translation('tools') }}
             {% elif category[1] == "Machinery" %}
-                🚜 {{ category[1] }}
+                🚜 {{ request.get_translation('machinery') }}
             {% else %}
                 {{ category[1] }}
             {% endif %}
         </h2>
-        <a href="/category/{{ category[0] }}" class="btn btn-outline-success btn-sm">View All</a>
+        <a href="/category/{{ category[0] }}" class="btn btn-outline-success btn-sm">{{ request.get_translation('view_all') }}</a>
     </div>
 
     {% if products %}
@@ -49,7 +49,7 @@
                         <p class="card-text fw-bold text-success fs-5">₹{{ product[2] }}</p>
                         <p class="card-text text-muted small">
                             {% if product[6]|int > 0 %}
-                                <span class="badge bg-success">In Stock</span>
+                                <span class="badge bg-success">{{ request.get_translation('stock') }}</span>
                             {% else %}
                                 <span class="badge bg-danger">Out of Stock</span>
                             {% endif %}
@@ -57,10 +57,10 @@
                         <div class="mt-auto d-flex gap-2">
                             {% if session.get('user') %}
                                 <a href="/add_to_cart/{{ product[0] }}" class="btn btn-success w-100">
-                                    <i class="bi bi-cart-plus"></i> Add to Cart
+                                    <i class="bi bi-cart-plus"></i> {{ request.get_translation('add_to_cart') }}
                                 </a>
                             {% else %}
-                                <a href="/login" class="btn btn-success w-100">Login to Buy</a>
+                                <a href="/login" class="btn btn-success w-100">{{ request.get_translation('login') }}</a>
                             {% endif %}
                         </div>
                     </div>
@@ -69,7 +69,7 @@
             {% endfor %}
         </div>
     {% else %}
-        <div class="alert alert-info">No products available in this category yet.</div>
+        <div class="alert alert-info">{{ request.get_translation('no_products', 'No products available in this category yet.') }}</div>
     {% endif %}
 </div>
 {% endfor %}

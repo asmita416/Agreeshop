@@ -3,9 +3,50 @@ import sqlite3
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 import json
+import os
 
 app = Flask(__name__)
 app.secret_key = "secretkey"
+
+# ---------- LANGUAGE/LOCALIZATION ----------
+SUPPORTED_LANGUAGES = ['en', 'hi', 'mr']
+translations = {}
+
+def load_translations():
+    """Load all translation files"""
+    global translations
+    for lang in SUPPORTED_LANGUAGES:
+        try:
+            with open(f'translations/{lang}.json', 'r', encoding='utf-8') as f:
+                translations[lang] = json.load(f)
+        except FileNotFoundError:
+            print(f"Warning: Translation file for {lang} not found")
+            translations[lang] = {}
+
+def get_locale():
+    """Get current language from session, default to English"""
+    return session.get('language', 'en')
+
+def get_translation(key, default=''):
+    """Get translated string for key"""
+    locale = get_locale()
+    return translations.get(locale, {}).get(key, translations.get('en', {}).get(key, default))
+
+# Load translations when app starts
+load_translations()
+
+@app.before_request
+def inject_translations():
+    """Make translation function available in all templates"""
+    request.get_translation = get_translation
+    request.current_language = get_locale()
+
+@app.route('/set_language/<language>')
+def set_language(language):
+    """Set the user's preferred language"""
+    if language in SUPPORTED_LANGUAGES:
+        session['language'] = language
+    return redirect(request.referrer or url_for('home'))
 
 # ---------- DATABASE ----------
 def init_db():
@@ -22,9 +63,15 @@ def init_db():
         address TEXT,
         city TEXT,
         pincode TEXT,
-        created_at TIMESTAMP
+        created_at TIMESTAMP,
+        role TEXT DEFAULT 'customer'
     )
     ''')
+
+    cursor.execute("PRAGMA table_info(users)")
+    user_columns = [row[1] for row in cursor.fetchall()]
+    if "role" not in user_columns:
+        cursor.execute("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'customer'")
 
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS categories (
@@ -165,41 +212,46 @@ def view_category(cat_id):
     return render_template("category.html", category=category, products=products, categories=categories)
 
 # ---------- REGISTER ----------
-@app.route('/register', methods=["GET","POST"])
-def register():
+@app.route('/register', defaults={'role': 'customer'}, methods=["GET","POST"])
+@app.route('/seller-register', defaults={'role': 'seller'}, methods=["GET","POST"])
+def register(role):
     error = None
     if request.method == "POST":
         username = request.form["username"]
         password = request.form["password"]
         email = request.form["email"]
         phone = request.form.get("phone", "")
+        role = request.form.get("role", role)
 
         try:
             conn = sqlite3.connect("database.db")
             cursor = conn.cursor()
             
             # Check if username already exists
-            cursor.execute("SELECT * FROM users WHERE username=?",(username,))
+            cursor.execute("SELECT * FROM users WHERE username=?", (username,))
             if cursor.fetchone():
                 error = "Username already exists!"
             else:
                 hashed_password = generate_password_hash(password)
-                cursor.execute("""INSERT INTO users (username,password,email,phone,created_at) 
-                               VALUES (?,?,?,?,?)""", 
-                             (username, hashed_password, email, phone, datetime.now()))
+                cursor.execute("""INSERT INTO users (username,password,email,phone,created_at,role) 
+                               VALUES (?,?,?,?,?,?)""", 
+                             (username, hashed_password, email, phone, datetime.now(), role))
                 conn.commit()
                 conn.close()
+                if role == 'seller':
+                    return redirect(url_for('login', role='seller'))
                 return redirect(url_for("login"))
         except Exception as e:
             error = f"Registration error: {e}"
         finally:
             if conn:
                 conn.close()
-    return render_template("register.html", error=error)
+    return render_template("register.html", error=error, role=role)
 
 # ---------- LOGIN ----------
-@app.route('/login', methods=["GET","POST"])
-def login():
+@app.route('/login', defaults={'role': 'customer'}, methods=["GET","POST"])
+@app.route('/seller-login', defaults={'role': 'seller'}, methods=["GET","POST"])
+def login(role):
     error = None
     if request.method == "POST":
         username = request.form["username"]
@@ -208,20 +260,28 @@ def login():
         try:
             conn = sqlite3.connect("database.db")
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM users WHERE username=?",(username,))
+            cursor.execute("SELECT * FROM users WHERE username=?", (username,))
             user = cursor.fetchone()
             conn.close()
 
             if user and check_password_hash(user[2], password):
-                session["user"] = username
-                session["cart"] = {}  # Initialize as dictionary
-                session.modified = True
-                return redirect(url_for("home"))
+                if user[9] != role:
+                    error = f"Please use the {role} login page for this account."
+                else:
+                    session["user"] = username
+                    session["user_role"] = role
+                    if role == 'customer':
+                        session["cart"] = {}
+                    session.modified = True
+                    if role == 'seller':
+                        return redirect(url_for('seller_dashboard'))
+                    return redirect(url_for("home"))
             else:
-                error = "Invalid username or password"
+                if not error:
+                    error = "Invalid username or password"
         except Exception as e:
             error = f"Login error: {e}"
-    return render_template("login.html", error=error)
+    return render_template("login.html", error=error, role=role)
 
 # ---------- ADD TO CART ----------
 @app.route('/add_to_cart/<int:product_id>')
@@ -394,7 +454,7 @@ def profile():
         """, (email, phone, address, city, pincode, session["user"]))
         
         conn.commit()
-        user = (user[0], user[1], user[2], email, phone, address, city, pincode, user[8])
+        user = (user[0], user[1], user[2], email, phone, address, city, pincode, user[8], user[9])
     
     conn.close()
     return render_template("profile.html", user=user)
@@ -590,6 +650,67 @@ def order_details(order_id):
     conn.close()
     
     return render_template("order_details.html", order=order, order_items=order_items, delivery=delivery)
+
+# ---------- CANCEL ORDER ----------
+@app.route('/cancel_order/<int:order_id>')
+def cancel_order(order_id):
+    if "user" not in session:
+        return redirect(url_for("login"))
+
+    conn = sqlite3.connect("database.db")
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT id FROM users WHERE username=?", (session["user"],))
+    user = cursor.fetchone()
+    if not user:
+        conn.close()
+        return redirect(url_for("login"))
+
+    cursor.execute("SELECT user_id, status FROM orders WHERE id=?", (order_id,))
+    order = cursor.fetchone()
+    if not order or order[0] != user[0]:
+        conn.close()
+        return redirect(url_for("my_orders"))
+
+    if order[1] not in ["Shipped", "Delivered", "Cancelled"]:
+        cursor.execute("UPDATE orders SET status=?, payment_status=? WHERE id=?", ("Cancelled", "Cancelled", order_id))
+        cursor.execute("UPDATE delivery SET status=?, notes=?, updated_at=? WHERE order_id=?", ("Cancelled", "Order cancelled by customer", datetime.now(), order_id))
+        conn.commit()
+
+    conn.close()
+    return redirect(url_for("order_details", order_id=order_id))
+
+# ---------- SELLER DASHBOARD ----------
+@app.route('/seller-dashboard', methods=["GET","POST"])
+def seller_dashboard():
+    if "user" not in session or session.get("user_role") != "seller":
+        return redirect(url_for('login', role='seller'))
+
+    conn = sqlite3.connect("database.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM categories")
+    categories = cursor.fetchall()
+    conn.close()
+
+    if request.method == "POST":
+        name = request.form["name"]
+        price = request.form["price"]
+        image = request.form["image"]
+        category_id = request.form["category_id"]
+        description = request.form.get("description", "")
+
+        try:
+            conn = sqlite3.connect("database.db")
+            cursor = conn.cursor()
+            cursor.execute("INSERT INTO products (name,price,image,category_id,description) VALUES (?,?,?,?,?)",
+                         (name,price,image,category_id,description))
+            conn.commit()
+            conn.close()
+            return redirect(url_for('seller_dashboard'))
+        except Exception as e:
+            print(f"Seller dashboard error: {e}")
+
+    return render_template("admin.html", categories=categories)
 
 # ---------- ADMIN ----------
 @app.route('/admin', methods=["GET","POST"])

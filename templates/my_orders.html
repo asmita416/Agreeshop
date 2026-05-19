@@ -64,10 +64,15 @@
                         {% endif %}
                     </p>
                 </div>
-                <div class="card-footer bg-light">
+                <div class="card-footer bg-light d-grid gap-2">
                     <a href="/order/{{ order[0] }}" class="btn btn-sm btn-outline-success w-100">
                         <i class="bi bi-eye"></i> View Details
                     </a>
+                    {% if order[4] not in ['Shipped', 'Delivered', 'Cancelled'] %}
+                        <a href="/cancel_order/{{ order[0] }}" class="btn btn-sm btn-danger w-100">
+                            <i class="bi bi-x-circle"></i> Cancel Order
+                        </a>
+                    {% endif %}
                 </div>
             </div>
         </div>

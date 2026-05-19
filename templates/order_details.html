@@ -183,11 +183,16 @@
         </div>
 
         <!-- ACTION BUTTONS -->
-        <div class="mt-4 d-flex gap-2">
-            <a href="/my-orders" class="btn btn-outline-success flex-grow-1">
+        <div class="mt-4 d-flex gap-2 flex-column">
+            <a href="/my-orders" class="btn btn-outline-success w-100">
                 <i class="bi bi-arrow-left"></i> Back to Orders
             </a>
-            <a href="/" class="btn btn-success flex-grow-1">
+            {% if order[4] not in ['Shipped', 'Delivered', 'Cancelled'] %}
+                <a href="/cancel_order/{{ order[0] }}" class="btn btn-danger w-100">
+                    <i class="bi bi-x-circle"></i> Cancel Order
+                </a>
+            {% endif %}
+            <a href="/" class="btn btn-success w-100">
                 <i class="bi bi-shop"></i> Shop More
             </a>
         </div>

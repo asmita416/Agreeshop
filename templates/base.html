@@ -63,28 +63,28 @@
                 <!-- HOME -->
                 <li class="nav-item">
                     <a class="nav-link" href="/">
-                        <i class="bi bi-house"></i> Home
+                        <i class="bi bi-house"></i> {{ request.get_translation('home') }}
                     </a>
                 </li>
 
                 <!-- CATEGORIES DROPDOWN -->
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="#" id="categoriesDropdown" role="button" data-bs-toggle="dropdown">
-                        <i class="bi bi-list"></i> Categories
+                        <i class="bi bi-list"></i> {{ request.get_translation('categories') }}
                     </a>
                     <ul class="dropdown-menu" aria-labelledby="categoriesDropdown">
-                        <li><a class="dropdown-item" href="/category/1">🌱 Seeds</a></li>
-                        <li><a class="dropdown-item" href="/category/2">🌿 Fertilizers</a></li>
-                        <li><a class="dropdown-item" href="/category/3">🐛 Pesticides</a></li>
-                        <li><a class="dropdown-item" href="/category/4">🔨 Tools</a></li>
-                        <li><a class="dropdown-item" href="/category/5">🚜 Machinery</a></li>
+                        <li><a class="dropdown-item" href="/category/1">🌱 {{ request.get_translation('seeds') }}</a></li>
+                        <li><a class="dropdown-item" href="/category/2">🌿 {{ request.get_translation('fertilizers') }}</a></li>
+                        <li><a class="dropdown-item" href="/category/3">🐛 {{ request.get_translation('pesticides') }}</a></li>
+                        <li><a class="dropdown-item" href="/category/4">🔨 {{ request.get_translation('tools') }}</a></li>
+                        <li><a class="dropdown-item" href="/category/5">🚜 {{ request.get_translation('machinery') }}</a></li>
                     </ul>
                 </li>
 
                 <!-- CART -->
                 <li class="nav-item">
                     <a class="nav-link position-relative" href="/cart">
-                        <i class="bi bi-cart"></i> Cart
+                        <i class="bi bi-cart"></i> {{ request.get_translation('cart') }}
                         {% set cart_count = session.get('cart', {})|length %}
                         {% if cart_count > 0 %}
                             <span class="badge">{{ cart_count }}</span>
@@ -92,12 +92,24 @@
                     </a>
                 </li>
 
+                <!-- LANGUAGE SELECTOR -->
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" id="languageDropdown" role="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-globe"></i> {{ request.get_translation('language') }}
+                    </a>
+                    <ul class="dropdown-menu" aria-labelledby="languageDropdown">
+                        <li><a class="dropdown-item {% if request.current_language == 'en' %}active{% endif %}" href="/set_language/en">{{ request.get_translation('english') }}</a></li>
+                        <li><a class="dropdown-item {% if request.current_language == 'hi' %}active{% endif %}" href="/set_language/hi">{{ request.get_translation('hindi') }}</a></li>
+                        <li><a class="dropdown-item {% if request.current_language == 'mr' %}active{% endif %}" href="/set_language/mr">{{ request.get_translation('marathi') }}</a></li>
+                    </ul>
+                </li>
+
                 <!-- USER MENU -->
                 {% if session.get('user') %}
                     <!-- WISHLIST -->
                     <li class="nav-item">
                         <a class="nav-link" href="/wishlist">
-                            <i class="bi bi-heart"></i> Wishlist
+                            <i class="bi bi-heart"></i> {{ request.get_translation('wishlist') }}
                         </a>
                     </li>
 
@@ -107,28 +119,39 @@
                             <i class="bi bi-person-circle"></i> {{ session.get('user') }}
                         </a>
                         <ul class="dropdown-menu" aria-labelledby="userDropdown">
-                            <li><a class="dropdown-item" href="/profile"><i class="bi bi-person"></i> Profile</a></li>
-                            <li><a class="dropdown-item" href="/my-orders"><i class="bi bi-bag"></i> My Orders</a></li>
-                            <li><a class="dropdown-item" href="/wishlist"><i class="bi bi-heart"></i> Wishlist</a></li>
+                            <li><a class="dropdown-item" href="/profile"><i class="bi bi-person"></i> {{ request.get_translation('profile') }}</a></li>
+                            <li><a class="dropdown-item" href="/my-orders"><i class="bi bi-bag"></i> {{ request.get_translation('my_orders') }}</a></li>
+                            <li><a class="dropdown-item" href="/wishlist"><i class="bi bi-heart"></i> {{ request.get_translation('wishlist') }}</a></li>
+                            {% if session.get('user_role') == 'seller' %}
+                                <li><a class="dropdown-item" href="/seller-dashboard"><i class="bi bi-shop"></i> Seller Dashboard</a></li>
+                            {% endif %}
                             {% if session.get('user') == 'admin' %}
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="/admin"><i class="bi bi-gear"></i> Admin Panel</a></li>
                             {% endif %}
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="/logout"><i class="bi bi-box-arrow-right"></i> Logout</a></li>
+                            <li><a class="dropdown-item" href="/logout"><i class="bi bi-box-arrow-right"></i> {{ request.get_translation('logout') }}</a></li>
                         </ul>
                     </li>
                 {% else %}
                     <!-- LOGIN & REGISTER -->
-                    <li class="nav-item">
-                        <a class="nav-link" href="/login">
-                            <i class="bi bi-box-arrow-in-right"></i> Login
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="loginDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-box-arrow-in-right"></i> {{ request.get_translation('login') }}
                         </a>
+                        <ul class="dropdown-menu" aria-labelledby="loginDropdown">
+                            <li><a class="dropdown-item" href="/login">Customer Login</a></li>
+                            <li><a class="dropdown-item" href="/seller-login">Seller Login</a></li>
+                        </ul>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/register">
-                            <i class="bi bi-person-plus"></i> Register
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="registerDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-person-plus"></i> {{ request.get_translation('register') }}
                         </a>
+                        <ul class="dropdown-menu" aria-labelledby="registerDropdown">
+                            <li><a class="dropdown-item" href="/register">Customer Register</a></li>
+                            <li><a class="dropdown-item" href="/seller-register">Seller Register</a></li>
+                        </ul>
                     </li>
                 {% endif %}
             </ul>
@@ -144,8 +167,8 @@
 <!-- FOOTER -->
 <footer class="text-center">
     <div class="container">
-        <p>&copy; 2024 AgriShop. All rights reserved.</p>
-        <p>Quality Agricultural Products | Fast Delivery | Best Prices</p>
+        <p>&copy; 2024 AgriShop. {{ request.get_translation('all_rights_reserved', 'All rights reserved.') }}</p>
+        <p>{{ request.get_translation('footer_message', 'Quality Agricultural Products | Fast Delivery | Best Prices') }}</p>
     </div>
 </footer>
 
