@@ -41,4 +41,65 @@
 <h4 class="mt-4">Product Management</h4>
 <p class="text-muted">Admin panel - manage your agricultural products</p>
 
+{% if requests_list is defined %}
+<hr>
+<h4 class="mt-4">Customer Sell Requests</h4>
+<p class="text-muted">Review requests from customers who want to sell products.</p>
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>#</th>
+            <th>User</th>
+            <th>Category</th>
+            <th>Price</th>
+            <th>Details</th>
+            <th>Image</th>
+            <th>Status</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for req in requests_list %}
+        <tr>
+            <td>{{ req[0] }}</td>
+            <td>{{ req[1] }}</td>
+            <td>{{ req[2] }}</td>
+            <td>₹{{ req[3] }}</td>
+            <td>{{ req[4] }}</td>
+            <td><a href="{{ req[5] }}" target="_blank">Image</a></td>
+            <td>{{ req[6] }}</td>
+            <td>
+                <div class="btn-group" role="group">
+                    {% if req[6] == 'pending' %}
+                        <form method="post" action="/admin/approve_request/{{ req[0] }}" style="display:inline">
+                            <button class="btn btn-sm btn-success">Approve</button>
+                        </form>
+                        <form method="post" action="/admin/reject_request/{{ req[0] }}" style="display:inline">
+                            <button class="btn btn-sm btn-danger">Reject</button>
+                        </form>
+                    {% endif %}
+                    <form method="post" action="/admin/delete_request/{{ req[0] }}" style="display:inline">
+                        <button class="btn btn-sm btn-outline-danger">Delete</button>
+                    </form>
+                </div>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+
+{% if users is defined %}
+<hr>
+<h4 class="mt-4">Users</h4>
+<table class="table table-sm">
+    <thead><tr><th>ID</th><th>Username</th><th>Role</th><th>Member Since</th></tr></thead>
+    <tbody>
+    {% for u in users %}
+        <tr><td>{{ u[0] }}</td><td>{{ u[1] }}</td><td>{{ u[2] }}</td><td>{{ u[3] }}</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+
 {% endblock %}

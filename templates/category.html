@@ -1,6 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
 
+<!-- NOTIFICATION ALERT -->
+<div id="notification-container" style="position: fixed; top: 20px; right: 20px; z-index: 9999;"></div>
+
 <!-- BREADCRUMB -->
 <nav aria-label="breadcrumb" class="mb-4">
     <ol class="breadcrumb">
@@ -22,11 +25,11 @@
         <div class="col-3 mb-4">
             <div class="card h-100 shadow-sm" style="transition: all 0.3s;">
                 <div style="position: relative; height: 200px; overflow: hidden;">
-                    <img src="{{ product[3] }}" class="card-img-top" alt="{{ product[1] }}" style="height: 100%; width: 100%; object-fit: cover;">
+                    <img src="{{ product[3] }}?v={{ now }}" class="card-img-top" alt="{{ product[1] }}" style="height: 100%; width: 100%; object-fit: cover;">
                     {% if session.get('user') %}
-                        <a href="/add_to_wishlist/{{ product[0] }}" class="btn btn-sm btn-light" style="position: absolute; top: 10px; right: 10px; border-radius: 50%; width: 40px; height: 40px; padding: 0; display: flex; align-items: center; justify-content: center;">
+                        <button onclick="addToWishlist({{ product[0] }})" class="btn btn-sm btn-light" style="position: absolute; top: 10px; right: 10px; border-radius: 50%; width: 40px; height: 40px; padding: 0; display: flex; align-items: center; justify-content: center; border: none; cursor: pointer;">
                             <i class="bi bi-heart"></i>
-                        </a>
+                        </button>
                     {% endif %}
                 </div>
                 <div class="card-body d-flex flex-column">
@@ -42,9 +45,9 @@
                     </p>
                     <div class="mt-auto">
                         {% if session.get('user') %}
-                            <a href="/add_to_cart/{{ product[0] }}" class="btn btn-success w-100">
+                            <button onclick="addToCart({{ product[0] }})" class="btn btn-success w-100" style="border: none; cursor: pointer;">
                                 <i class="bi bi-cart-plus"></i> Add to Cart
-                            </a>
+                            </button>
                         {% else %}
                             <a href="/login" class="btn btn-success w-100">Login to Buy</a>
                         {% endif %}
@@ -59,5 +62,68 @@
         <h4>No products available in this category</h4>
     </div>
 {% endif %}
+
+<script>
+function showNotification(message, type = 'success') {
+    const container = document.getElementById('notification-container');
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.style.cssText = 'min-width: 300px; margin-bottom: 10px;';
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    `;
+    container.appendChild(alertDiv);
+    
+    // Auto remove after 3 seconds
+    setTimeout(() => {
+        alertDiv.remove();
+    }, 3000);
+}
+
+function addToCart(productId) {
+    fetch(`/add_to_cart/${productId}`, {
+        method: 'GET',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            showNotification('✓ ' + data.message, 'success');
+        } else {
+            showNotification('✗ ' + data.message, 'danger');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('Error adding to cart', 'danger');
+    });
+}
+
+function addToWishlist(productId) {
+    fetch(`/add_to_wishlist/${productId}`, {
+        method: 'GET',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            showNotification('♥ ' + data.message, 'success');
+        } else if (data.status === 'info') {
+            showNotification('ℹ ' + data.message, 'info');
+        } else {
+            showNotification('✗ ' + data.message, 'danger');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('Error adding to wishlist', 'danger');
+    });
+}
+</script>
 
 {% endblock %}

@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
 import sqlite3
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
@@ -7,6 +7,7 @@ import os
 
 app = Flask(__name__)
 app.secret_key = "secretkey"
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 
 # ---------- LANGUAGE/LOCALIZATION ----------
 SUPPORTED_LANGUAGES = ['en', 'hi', 'mr']
@@ -156,6 +157,21 @@ def init_db():
     )
     ''')
 
+    # Table to store customer requests to sell products (admin approval required)
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS seller_requests (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        category TEXT,
+        expected_price REAL,
+        details TEXT,
+        image_url TEXT,
+        status TEXT DEFAULT 'pending',
+        created_at TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users (id)
+    )
+    ''')
+
     # Insert default categories if they don't exist
     cursor.execute("INSERT OR IGNORE INTO categories (name, description) VALUES (?, ?)", ("Seeds", "High-quality seeds for various crops"))
     cursor.execute("INSERT OR IGNORE INTO categories (name, description) VALUES (?, ?)", ("Fertilizers", "Organic and chemical fertilizers"))
@@ -164,7 +180,20 @@ def init_db():
     cursor.execute("INSERT OR IGNORE INTO categories (name, description) VALUES (?, ?)", ("Machinery", "Agricultural machinery"))
 
     conn.commit()
-    conn.close()
+    # Ensure an admin user exists (username: AYS2, password: 1234)
+    try:
+        conn = sqlite3.connect("database.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM users WHERE username=?", ("AYS2",))
+        if not cursor.fetchone():
+            hashed_admin_pw = generate_password_hash("1234")
+            cursor.execute("INSERT INTO users (username,password,email,phone,address,city,pincode,created_at,role) VALUES (?,?,?,?,?,?,?,?,?)",
+                           ("AYS2", hashed_admin_pw, "admin@agreeshop.local", "", "", "", "", datetime.now(), "admin"))
+            conn.commit()
+    except Exception:
+        pass
+    finally:
+        conn.close()
 
 # ---------- HOME ----------
 @app.route('/')
@@ -189,7 +218,7 @@ def home():
         category_products.append((category, products))
 
     conn.close()
-    return render_template("index.html", category_products=category_products, categories=categories)
+    return render_template("index.html", category_products=category_products, categories=categories, now=datetime.now().timestamp())
 
 # ---------- CATEGORY VIEW ----------
 @app.route('/category/<int:cat_id>')
@@ -209,19 +238,19 @@ def view_category(cat_id):
     categories = cursor.fetchall()
 
     conn.close()
-    return render_template("category.html", category=category, products=products, categories=categories)
+    return render_template("category.html", category=category, products=products, categories=categories, now=datetime.now().timestamp())
 
 # ---------- REGISTER ----------
-@app.route('/register', defaults={'role': 'customer'}, methods=["GET","POST"])
-@app.route('/seller-register', defaults={'role': 'seller'}, methods=["GET","POST"])
-def register(role):
+@app.route('/register', methods=["GET","POST"])
+def register():
     error = None
+    role = 'customer'
+    conn = None
     if request.method == "POST":
         username = request.form["username"]
         password = request.form["password"]
         email = request.form["email"]
         phone = request.form.get("phone", "")
-        role = request.form.get("role", role)
 
         try:
             conn = sqlite3.connect("database.db")
@@ -238,8 +267,6 @@ def register(role):
                              (username, hashed_password, email, phone, datetime.now(), role))
                 conn.commit()
                 conn.close()
-                if role == 'seller':
-                    return redirect(url_for('login', role='seller'))
                 return redirect(url_for("login"))
         except Exception as e:
             error = f"Registration error: {e}"
@@ -250,11 +277,10 @@ def register(role):
 
 # ---------- LOGIN ----------
 @app.route('/login', defaults={'role': 'customer'}, methods=["GET","POST"])
-@app.route('/seller-login', defaults={'role': 'seller'}, methods=["GET","POST"])
 def login(role):
     error = None
     if request.method == "POST":
-        username = request.form["username"]
+        username = request.form["username"].strip()
         password = request.form["password"]
 
         try:
@@ -264,23 +290,36 @@ def login(role):
             user = cursor.fetchone()
             conn.close()
 
-            if user and check_password_hash(user[2], password):
-                if user[9] != role:
-                    error = f"Please use the {role} login page for this account."
+            # Debug: Print user info
+            if user:
+                print(f"[DEBUG] User found: {username}")
+                print(f"[DEBUG] Expected role: {role}, User role: {user[9]}")
+                password_match = check_password_hash(user[2], password)
+                print(f"[DEBUG] Password match: {password_match}")
+
+                # Block admin from using customer login
+                if user[9] == 'admin' and role == 'customer':
+                    error = "Please use the admin login page"
+                # Seller accounts cannot login directly
+                elif user[9] == 'seller':
+                    error = "Seller accounts cannot login directly. Submit a sell request from your profile."
+                elif not password_match:
+                    error = "Invalid password"
+                    print(f"[DEBUG] Password check failed for {username}")
                 else:
                     session["user"] = username
-                    session["user_role"] = role
-                    if role == 'customer':
+                    session["user_role"] = user[9]
+                    if user[9] == 'customer':
                         session["cart"] = {}
                     session.modified = True
-                    if role == 'seller':
-                        return redirect(url_for('seller_dashboard'))
+                    print(f"[DEBUG] Login successful for {username}")
                     return redirect(url_for("home"))
             else:
-                if not error:
-                    error = "Invalid username or password"
+                error = "Username not found"
+                print(f"[DEBUG] User not found: {username}")
         except Exception as e:
             error = f"Login error: {e}"
+            print(f"[DEBUG] Login exception: {e}")
     return render_template("login.html", error=error, role=role)
 
 # ---------- ADD TO CART ----------
@@ -296,6 +335,12 @@ def add_to_cart(product_id):
         cart[str(product_id)] = 1
     
     session.modified = True
+    
+    # Check if it's an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({'status': 'success', 'message': 'Product added to cart'})
+    
+    flash("Product added to cart", "success")
     return redirect(request.referrer or url_for("home"))
 
 # ---------- VIEW CART ----------
@@ -329,7 +374,7 @@ def cart():
     shipping = 50 if total > 0 else 0
     final_total = total + shipping
     
-    return render_template("cart.html", cart_items=cart_items, total=total, shipping=shipping, final_total=final_total)
+    return render_template("cart.html", cart_items=cart_items, total=total, shipping=shipping, final_total=final_total, now=datetime.now().timestamp())
 
 # ---------- UPDATE CART QUANTITY ----------
 @app.route('/update_cart/<int:product_id>/<int:quantity>')
@@ -383,12 +428,14 @@ def wishlist():
         wishlist_items = []
     
     conn.close()
-    return render_template("wishlist.html", wishlist_items=wishlist_items)
+    return render_template("wishlist.html", wishlist_items=wishlist_items, now=datetime.now().timestamp())
 
 # ---------- ADD TO WISHLIST ----------
 @app.route('/add_to_wishlist/<int:product_id>')
 def add_to_wishlist(product_id):
     if "user" not in session:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'status': 'error', 'message': 'Please login first'})
         return redirect(url_for("login"))
     
     conn = sqlite3.connect("database.db")
@@ -405,14 +452,25 @@ def add_to_wishlist(product_id):
                 VALUES (?, ?, ?)
             """, (user[0], product_id, datetime.now()))
             conn.commit()
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'status': 'success', 'message': 'Product added to wishlist'})
+            flash("Product added to wishlist", "success")
+        else:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'status': 'info', 'message': 'Product is already in your wishlist'})
+            flash("Product is already in your wishlist", "info")
     
     conn.close()
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({'status': 'success', 'message': 'Product added to wishlist'})
     return redirect(request.referrer or url_for("home"))
 
 # ---------- REMOVE FROM WISHLIST ----------
 @app.route('/remove_from_wishlist/<int:product_id>')
 def remove_from_wishlist(product_id):
     if "user" not in session:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'status': 'error', 'message': 'Please login first'})
         return redirect(url_for("login"))
     
     conn = sqlite3.connect("database.db")
@@ -426,6 +484,8 @@ def remove_from_wishlist(product_id):
         conn.commit()
     
     conn.close()
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({'status': 'success', 'message': 'Product removed from wishlist'})
     return redirect(url_for("wishlist"))
 
 # ---------- PROFILE ----------
@@ -436,9 +496,13 @@ def profile():
     
     conn = sqlite3.connect("database.db")
     cursor = conn.cursor()
-    
+
     cursor.execute("SELECT * FROM users WHERE username=?", (session["user"],))
     user = cursor.fetchone()
+    cursor.execute("SELECT * FROM categories")
+    categories = cursor.fetchall()
+    cursor.execute("SELECT id, category, expected_price, details, image_url, status, created_at FROM seller_requests WHERE user_id=(SELECT id FROM users WHERE username=?) ORDER BY created_at DESC", (session["user"],))
+    user_requests = cursor.fetchall()
     
     if request.method == "POST":
         email = request.form.get("email", "")
@@ -457,7 +521,7 @@ def profile():
         user = (user[0], user[1], user[2], email, phone, address, city, pincode, user[8], user[9])
     
     conn.close()
-    return render_template("profile.html", user=user)
+    return render_template("profile.html", user=user, categories=categories, user_requests=user_requests)
 
 # ---------- CHECKOUT ----------
 @app.route('/checkout', methods=["GET","POST"])
@@ -649,7 +713,7 @@ def order_details(order_id):
     
     conn.close()
     
-    return render_template("order_details.html", order=order, order_items=order_items, delivery=delivery)
+    return render_template("order_details.html", order=order, order_items=order_items, delivery=delivery, now=datetime.now().timestamp())
 
 # ---------- CANCEL ORDER ----------
 @app.route('/cancel_order/<int:order_id>')
@@ -680,43 +744,14 @@ def cancel_order(order_id):
     conn.close()
     return redirect(url_for("order_details", order_id=order_id))
 
-# ---------- SELLER DASHBOARD ----------
-@app.route('/seller-dashboard', methods=["GET","POST"])
-def seller_dashboard():
-    if "user" not in session or session.get("user_role") != "seller":
-        return redirect(url_for('login', role='seller'))
-
-    conn = sqlite3.connect("database.db")
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM categories")
-    categories = cursor.fetchall()
-    conn.close()
-
-    if request.method == "POST":
-        name = request.form["name"]
-        price = request.form["price"]
-        image = request.form["image"]
-        category_id = request.form["category_id"]
-        description = request.form.get("description", "")
-
-        try:
-            conn = sqlite3.connect("database.db")
-            cursor = conn.cursor()
-            cursor.execute("INSERT INTO products (name,price,image,category_id,description) VALUES (?,?,?,?,?)",
-                         (name,price,image,category_id,description))
-            conn.commit()
-            conn.close()
-            return redirect(url_for('seller_dashboard'))
-        except Exception as e:
-            print(f"Seller dashboard error: {e}")
-
-    return render_template("admin.html", categories=categories)
+# Seller dashboard removed: sellers cannot directly list products. Use sell-request flow.
 
 # ---------- ADMIN ----------
 @app.route('/admin', methods=["GET","POST"])
 def admin():
-    if "user" not in session:
-        return redirect(url_for("login"))
+    # Only admin users can access
+    if "user" not in session or session.get('user_role') != 'admin':
+        return redirect(url_for("admin_login"))
 
     conn = sqlite3.connect("database.db")
     cursor = conn.cursor()
@@ -742,7 +777,130 @@ def admin():
         except Exception as e:
             print(f"Admin error: {e}")
 
-    return render_template("admin.html", categories=categories)
+    # Show pending sell requests and user list
+    conn = sqlite3.connect("database.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT sr.id, u.username, sr.category, sr.expected_price, sr.details, sr.image_url, sr.status, sr.created_at FROM seller_requests sr JOIN users u ON sr.user_id = u.id ORDER BY sr.created_at DESC")
+    requests_list = cursor.fetchall()
+    cursor.execute("SELECT id, username, role, created_at FROM users ORDER BY created_at DESC")
+    users = cursor.fetchall()
+    conn.close()
+
+    return render_template("admin.html", categories=categories, requests_list=requests_list, users=users)
+
+
+@app.route('/admin-login', methods=["GET", "POST"]) 
+def admin_login():
+    error = None
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        try:
+            conn = sqlite3.connect("database.db")
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM users WHERE username=?", (username,))
+            user = cursor.fetchone()
+            conn.close()
+
+            if user and user[9] == 'admin' and check_password_hash(user[2], password):
+                session['user'] = username
+                session['user_role'] = 'admin'
+                session.modified = True
+                return redirect(url_for('admin'))
+            else:
+                error = 'Invalid admin credentials'
+        except Exception as e:
+            error = f'Login error: {e}'
+    return render_template('login.html', error=error, role='admin')
+
+
+@app.route('/request-sell', methods=['POST'])
+def request_sell():
+    if 'user' not in session:
+        return redirect(url_for('login'))
+    category = request.form.get('category')
+    expected_price = request.form.get('expected_price')
+    details = request.form.get('details')
+    image_url = request.form.get('image_url')
+
+    try:
+        conn = sqlite3.connect("database.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM users WHERE username=?", (session['user'],))
+        user = cursor.fetchone()
+        if user:
+            cursor.execute("INSERT INTO seller_requests (user_id, category, expected_price, details, image_url, status, created_at) VALUES (?,?,?,?,?,?,?)",
+                           (user[0], category, expected_price or 0.0, details, image_url, 'pending', datetime.now()))
+            conn.commit()
+        conn.close()
+        flash('Your sell request has been submitted to admin for review', 'success')
+    except Exception as e:
+        print(f"Request sell error: {e}")
+        flash('Error submitting sell request', 'danger')
+    return redirect(url_for('profile'))
+
+
+@app.route('/admin/approve_request/<int:req_id>', methods=['POST', 'GET'])
+def approve_request(req_id):
+    if 'user' not in session or session.get('user_role') != 'admin':
+        return redirect(url_for('admin_login'))
+    try:
+        conn = sqlite3.connect("database.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT user_id, category, expected_price, details, image_url FROM seller_requests WHERE id=?", (req_id,))
+        req = cursor.fetchone()
+        if req:
+            # Add product to products table (assign to a default category if not matched)
+            name = f"User Listing - {req[1]}"
+            price = req[2] or 0
+            image = req[4] or ''
+            # find category id by name, else default to 1
+            cursor.execute("SELECT id FROM categories WHERE name=?", (req[1],))
+            cat = cursor.fetchone()
+            category_id = cat[0] if cat else 1
+            cursor.execute("INSERT INTO products (name, price, image, category_id, description, stock) VALUES (?,?,?,?,?,?)",
+                           (name, price, image, category_id, req[3], 10))
+            cursor.execute("UPDATE seller_requests SET status='approved' WHERE id=?", (req_id,))
+            conn.commit()
+        conn.close()
+        flash('Request approved and product added', 'success')
+    except Exception as e:
+        print(f"Approve request error: {e}")
+        flash('Error approving request', 'danger')
+    return redirect(url_for('admin'))
+
+
+@app.route('/admin/reject_request/<int:req_id>', methods=['POST'])
+def reject_request(req_id):
+    if 'user' not in session or session.get('user_role') != 'admin':
+        return redirect(url_for('admin_login'))
+    try:
+        conn = sqlite3.connect("database.db")
+        cursor = conn.cursor()
+        cursor.execute("UPDATE seller_requests SET status='rejected' WHERE id=?", (req_id,))
+        conn.commit()
+        conn.close()
+        flash('Request rejected', 'info')
+    except Exception as e:
+        print(f"Reject request error: {e}")
+        flash('Error rejecting request', 'danger')
+    return redirect(url_for('admin'))
+
+@app.route('/admin/delete_request/<int:req_id>', methods=['POST'])
+def delete_request(req_id):
+    if 'user' not in session or session.get('user_role') != 'admin':
+        return redirect(url_for('admin_login'))
+    try:
+        conn = sqlite3.connect("database.db")
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM seller_requests WHERE id=?", (req_id,))
+        conn.commit()
+        conn.close()
+        flash('Request deleted', 'warning')
+    except Exception as e:
+        print(f"Delete request error: {e}")
+        flash('Error deleting request', 'danger')
+    return redirect(url_for('admin'))
 
 # ---------- ADD SAMPLE PRODUCTS ----------
 def add_sample_products():
@@ -757,35 +915,35 @@ def add_sample_products():
 
     sample_products = [
         # Seeds
-        ("Tomato Seeds", 150, "/static/images/tomato_seeds.jpg", 1, "High-quality hybrid tomato seeds, disease resistant"),
-        ("Wheat Seeds", 200, "/static/images/wheat_seeds.jpg", 1, "Premium quality wheat seeds for better yield"),
-        ("Rice Seeds", 180, "/static/images/rice_seeds.jpg", 1, "Long grain rice seeds, high germination rate"),
+        ("Tomato Seeds", 150, "/static/images/tomato_seeds.jpg", 1, "High-quality hybrid tomato seeds, disease resistant", 50),
+        ("Wheat Seeds", 200, "/static/images/wheat_seeds.jpg", 1, "Premium quality wheat seeds for better yield", 50),
+        ("Rice Seeds", 180, "/static/images/rice_seeds.webp", 1, "Long grain rice seeds, high germination rate", 50),
 
         # Fertilizers
-        ("NPK Fertilizer 20-20-20", 450, "/static/images/npk_fertilizer.jpg", 2, "Balanced NPK fertilizer for all crops"),
-        ("Organic Manure", 300, "/static/images/organic_manure.jpg", 2, "100% organic manure, improves soil health"),
-        ("Urea Fertilizer", 250, "/static/images/urea_fertilizer.jpg", 2, "Nitrogen-rich fertilizer for leafy vegetables"),
+        ("NPK Fertilizer 20-20-20", 450, "/static/images/npk_fertilizer.jpg", 2, "Balanced NPK fertilizer for all crops", 50),
+        ("Organic Manure", 300, "/static/images/organic_manure.jpg", 2, "100% organic manure, improves soil health", 50),
+        ("Urea Fertilizer", 250, "/static/images/urea_fertilizer.jpg", 2, "Nitrogen-rich fertilizer for leafy vegetables", 50),
 
         # Pesticides
-        ("Insecticide Spray", 350, "/static/images/insecticide_spray.jpg", 3, "Effective against common garden pests"),
-        ("Fungicide Powder", 280, "/static/images/fungicide_powder.jpg", 3, "Controls fungal diseases in plants"),
-        ("Herbicide Solution", 420, "/static/images/herbicide_solution.jpg", 3, "Selective weed control solution"),
+        ("Insecticide Spray", 350, "/static/images/insecticide_spray.jpg", 3, "Effective against common garden pests", 50),
+        ("Fungicide Powder", 280, "/static/images/fungicide_powder.jpg", 3, "Controls fungal diseases in plants", 50),
+        ("Herbicide Solution", 420, "/static/images/herbicide_solution.jpg", 3, "Selective weed control solution", 50),
 
         # Tools
-        ("Garden Hoe", 180, "/static/images/garden_hoe.jpg", 4, "Sturdy garden hoe for soil cultivation"),
-        ("Watering Can", 120, "/static/images/watering_can.jpg", 4, "5-liter capacity watering can"),
-        ("Pruning Shears", 250, "/static/images/pruning_shears.jpg", 4, "Professional pruning shears"),
+        ("Garden Hoe", 180, "/static/images/garden_hoe.jpg", 4, "Sturdy garden hoe for soil cultivation", 50),
+        ("Watering Can", 120, "/static/images/watering_can.jpg", 4, "5-liter capacity watering can", 50),
+        ("Pruning Shears", 250, "/static/images/pruning_shears.jpg", 4, "Professional pruning shears", 50),
 
         # Machinery
-        ("Hand Tractor", 15000, "/static/images/hand_tractor.jpg", 5, "Mini hand tractor for small farms"),
-        ("Sprayer Pump", 850, "/static/images/sprayer_pump.jpg", 5, "Battery operated sprayer pump"),
-        ("Seed Drill", 2200, "/static/images/seed_drill.jpg", 5, "Manual seed drill for precise planting")
+        ("Hand Tractor", 15000, "/static/images/hand_tractor.jpg", 5, "Mini hand tractor for small farms", 50),
+        ("Sprayer Pump", 850, "/static/images/sprayer_pump.jpg", 5, "Battery operated sprayer pump", 50),
+        ("Seed Drill", 2200, "/static/images/seed_drill.jpg", 5, "Manual seed drill for precise planting", 50)
     ]
 
     for product in sample_products:
         cursor.execute("""
-            INSERT INTO products (name, price, image, category_id, description)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO products (name, price, image, category_id, description, stock)
+            VALUES (?, ?, ?, ?, ?, ?)
         """, product)
 
     conn.commit()

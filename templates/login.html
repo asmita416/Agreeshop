@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 
-<h2 class="mb-4">{% if role == 'seller' %}Seller Login{% else %}Customer Login{% endif %}</h2>
+<h2 class="mb-4">{% if role == 'admin' %}Admin Login{% else %}Customer Login{% endif %}</h2>
 
 {% if error %}
     <div class="alert alert-danger">
@@ -10,7 +10,9 @@
 {% endif %}
 
 <form method="POST" style="max-width: 400px; margin: auto;">
-    <input type="hidden" name="role" value="{{ role }}">
+    {% if role != 'admin' %}
+    <input type="hidden" name="role" value="customer">
+    {% endif %}
     <div class="mb-3">
         <label>Username</label>
         <input type="text" name="username" class="form-control" required>
@@ -24,12 +26,8 @@
     <button class="btn btn-success">Login</button>
 </form>
 
-<p class="mt-3">
-    {% if role == 'seller' %}
-        Don't have a seller account? <a href="/seller-register">Register as Seller</a>
-    {% else %}
+    <p class="mt-3">
         Don't have an account? <a href="/register">Register</a>
-    {% endif %}
-</p>
+    </p>
 
 {% endblock %}
