@@ -765,28 +765,60 @@ def admin():
         image = request.form["image"]
         category_id = request.form["category_id"]
         description = request.form.get("description", "")
+        stock = request.form.get("stock", 0)
 
         try:
             conn = sqlite3.connect("database.db")
             cursor = conn.cursor()
-            cursor.execute("INSERT INTO products (name,price,image,category_id,description) VALUES (?,?,?,?,?)",
-                         (name,price,image,category_id,description))
+            cursor.execute("INSERT INTO products (name,price,image,category_id,description,stock) VALUES (?,?,?,?,?,?)",
+                         (name,price,image,category_id,description,stock))
             conn.commit()
             conn.close()
             return redirect(url_for("admin"))
         except Exception as e:
             print(f"Admin error: {e}")
 
-    # Show pending sell requests and user list
+    # Show pending sell requests, user list, and product list
     conn = sqlite3.connect("database.db")
     cursor = conn.cursor()
     cursor.execute("SELECT sr.id, u.username, sr.category, sr.expected_price, sr.details, sr.image_url, sr.status, sr.created_at FROM seller_requests sr JOIN users u ON sr.user_id = u.id ORDER BY sr.created_at DESC")
     requests_list = cursor.fetchall()
     cursor.execute("SELECT id, username, role, created_at FROM users ORDER BY created_at DESC")
     users = cursor.fetchall()
+    cursor.execute("SELECT p.id, p.name, p.price, p.image, p.category_id, p.description, p.stock, c.name FROM products p JOIN categories c ON p.category_id = c.id ORDER BY p.id DESC")
+    products = cursor.fetchall()
     conn.close()
 
-    return render_template("admin.html", categories=categories, requests_list=requests_list, users=users)
+    return render_template("admin.html", categories=categories, requests_list=requests_list, users=users, products=products)
+
+@app.route('/admin/delete_product/<int:product_id>', methods=['POST'])
+def delete_product(product_id):
+    if 'user' not in session or session.get('user_role') != 'admin':
+        return redirect(url_for('admin_login'))
+    try:
+        conn = sqlite3.connect("database.db")
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM products WHERE id=?", (product_id,))
+        conn.commit()
+        conn.close()
+        flash('Product deleted successfully', 'warning')
+    except Exception as e:
+        print(f"Delete product error: {e}")
+        flash('Error deleting product', 'danger')
+    return redirect(url_for('admin'))
+
+@app.route('/product/<int:product_id>')
+def product_detail(product_id):
+    conn = sqlite3.connect("database.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT p.*, c.name FROM products p JOIN categories c ON p.category_id = c.id WHERE p.id=?", (product_id,))
+    product = cursor.fetchone()
+    conn.close()
+
+    if not product:
+        return redirect(url_for('home'))
+
+    return render_template('product_detail.html', product=product)
 
 
 @app.route('/admin-login', methods=["GET", "POST"]) 

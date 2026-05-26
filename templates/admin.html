@@ -34,12 +34,50 @@
         <textarea class="form-control" name="description" placeholder="Product description" rows="3"></textarea>
     </div>
 
+    <div class="mb-3">
+        <label class="form-label">Stock</label>
+        <input class="form-control" name="stock" placeholder="Stock quantity" type="number" min="0" value="0">
+    </div>
+
     <button class="btn btn-success">Add Product</button>
 </form>
 
 <hr>
 <h4 class="mt-4">Product Management</h4>
 <p class="text-muted">Admin panel - manage your agricultural products</p>
+
+{% if products is defined %}
+<table class="table table-striped mt-3">
+    <thead>
+        <tr>
+            <th>#</th>
+            <th>Name</th>
+            <th>Category</th>
+            <th>Price</th>
+            <th>Stock</th>
+            <th>Description</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for product in products %}
+        <tr>
+            <td>{{ product[0] }}</td>
+            <td>{{ product[1] }}</td>
+            <td>{{ product[7] }}</td>
+            <td>₹{{ product[2] }}</td>
+            <td>{{ product[6] or 0 }}</td>
+            <td>{{ product[5] }}</td>
+            <td>
+                <form method="post" action="/admin/delete_product/{{ product[0] }}" style="display:inline-block;">
+                    <button class="btn btn-sm btn-danger">Delete</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
 
 {% if requests_list is defined %}
 <hr>
